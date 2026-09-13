@@ -1,0 +1,8 @@
+{
+  "name": "Remix Sistem Pembayaran SPP Bulanan",
+  "description": "Aplikasi manajemen dan pembayaran SPP bulanan sekolah dan pesantren terintegrasi Midtrans dan Firebase",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

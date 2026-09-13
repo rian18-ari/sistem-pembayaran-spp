@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "users": {
+      "title": "Users",
+      "description": "User accounts with roles (admin or parent)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "parent"] },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "name", "role"]
+    },
+    "parents": {
+      "title": "Parents",
+      "description": "Parent/guardian information linked to students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "studentIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "phone"]
+    },
+    "classes": {
+      "title": "Classes",
+      "description": "School / Islamic boarding school classes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "grade": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "grade", "academicYear"]
+    },
+    "spp_settings": {
+      "title": "SPP Settings",
+      "description": "Monthly SPP fee configured per class and academic year",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "className": { "type": "string" },
+        "academicYear": { "type": "string" },
+        "monthlyFee": { "type": "number" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["classId", "academicYear", "monthlyFee"]
+    },
+    "students": {
+      "title": "Students",
+      "description": "Students/santri profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nis": { "type": "string" },
+        "nisn": { "type": "string" },
+        "name": { "type": "string" },
+        "classId": { "type": "string" },
+        "className": { "type": "string" },
+        "parentId": { "type": "string" },
+        "parentName": { "type": "string" },
+        "gender": { "type": "string", "enum": ["L", "P"] },
+        "status": { "type": "string", "enum": ["active", "graduated", "inactive"] },
+        "joinedYear": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["nis", "name", "classId", "parentId"]
+    },
+    "invoices": {
+      "title": "Invoices",
+      "description": "Monthly SPP invoices for students",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentNis": { "type": "string" },
+        "classId": { "type": "string" },
+        "className": { "type": "string" },
+        "parentId": { "type": "string" },
+        "parentName": { "type": "string" },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "academicYear": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["UNPAID", "PENDING", "PAID", "EXPIRED", "CANCELLED"] },
+        "dueDate": { "type": "string" },
+        "paidAt": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "activePaymentId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["invoiceNumber", "studentId", "parentId", "month", "year", "amount", "status"]
+    },
+    "payments": {
+      "title": "Payments",
+      "description": "Payment transactions attempted against invoices via Midtrans",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "invoiceId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "studentId": { "type": "string" },
+        "parentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "snapToken": { "type": "string" },
+        "snapRedirectUrl": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "paymentType": { "type": "string" },
+        "transactionStatus": { "type": "string" },
+        "fraudStatus": { "type": "string" },
+        "settlementTime": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["invoiceId", "invoiceNumber", "amount"]
+    }
+  }
+}
