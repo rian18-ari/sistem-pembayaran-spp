@@ -11,18 +11,20 @@ try {
 }
 
 const firebaseConfig = {
-  apiKey: configJson.apiKey,
-  authDomain: configJson.authDomain,
-  projectId: configJson.projectId,
-  storageBucket: configJson.storageBucket,
-  messagingSenderId: configJson.messagingSenderId,
-  appId: configJson.appId,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || configJson.apiKey,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || configJson.authDomain,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || configJson.projectId,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || configJson.storageBucket,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || configJson.messagingSenderId,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || configJson.appId,
 };
 
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const db: Firestore = configJson.firestoreDatabaseId && configJson.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, configJson.firestoreDatabaseId)
+const firestoreDatabaseId = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || configJson.firestoreDatabaseId;
+
+export const db: Firestore = firestoreDatabaseId && firestoreDatabaseId !== '(default)'
+  ? getFirestore(app, firestoreDatabaseId)
   : getFirestore(app);
 
 export const auth: Auth = getAuth(app);

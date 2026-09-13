@@ -7,8 +7,8 @@ export interface MidtransConfig {
 }
 
 export function getMidtransConfig(): MidtransConfig {
-  const serverKey = process.env.MIDTRANS_SERVER_KEY || '';
-  const clientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '';
+  const serverKey = (process.env.MIDTRANS_SERVER_KEY || '').trim().replace(/^["']|["']$/g, '');
+  const clientKey = (process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || '').trim().replace(/^["']|["']$/g, '');
   const isProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
 
   return {
@@ -48,57 +48,51 @@ export async function createMidtransSnapTransaction(params: {
   };
 }): Promise<{ token: string; redirect_url: string; isSimulated?: boolean }> {
   const config = getMidtransConfig();
-  const isPlaceholderKey = !config.serverKey || config.serverKey.includes('YOUR_SANDBOX_SERVER_KEY');
 
-  // If server key is real/configured, call official Midtrans Snap endpoint
-  if (!isPlaceholderKey) {
-    const endpoint = config.isProduction ? MIDTRANS_SNAP_BASE_URL.production : MIDTRANS_SNAP_BASE_URL.sandbox;
-    const authHeader = `Basic ${Buffer.from(`${config.serverKey}:`).toString('base64')}`;
-
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: authHeader,
-        },
-        body: JSON.stringify({
-          transaction_details: {
-            order_id: params.orderId,
-            gross_amount: Math.round(params.grossAmount),
-          },
-          item_details: params.itemDetails,
-          customer_details: params.customerDetails,
-          custom_field1: params.invoiceId || '',
-          callbacks: {
-            finish: `${process.env.APP_URL || ''}/payment/success?order_id=${params.orderId}`,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.warn('Midtrans API responded with error:', errorData);
-      } else {
-        const data = await response.json();
-        return {
-          token: data.token,
-          redirect_url: data.redirect_url,
-          isSimulated: false,
-        };
-      }
-    } catch (err) {
-      console.warn('Network error reaching Midtrans Snap API, using simulator mode:', err);
-    }
+  if (!config.serverKey) {
+    throw new Error('MIDTRANS_SERVER_KEY belum diatur di environment variable server.');
   }
 
-  // Graceful Sandbox Simulator Token for development / test preview
-  const simulatedToken = `SANDBOX-SNAP-${crypto.randomBytes(12).toString('hex')}`;
+  const endpoint = config.isProduction ? MIDTRANS_SNAP_BASE_URL.production : MIDTRANS_SNAP_BASE_URL.sandbox;
+  const authHeader = `Basic ${Buffer.from(`${config.serverKey}:`).toString('base64')}`;
+
+  const requestBody = {
+    transaction_details: {
+      order_id: params.orderId,
+      gross_amount: Math.round(params.grossAmount),
+    },
+    item_details: params.itemDetails,
+    customer_details: params.customerDetails,
+    custom_field1: params.invoiceId || '',
+    callbacks: {
+      finish: `${process.env.APP_URL || ''}/payment/success?order_id=${params.orderId}`,
+    },
+  };
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: authHeader,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMsg = Array.isArray(errorData?.error_messages)
+      ? errorData.error_messages.join(', ')
+      : errorData?.message || `Midtrans Snap API returned HTTP ${response.status}`;
+    console.error('[Midtrans Snap] API Error:', errorMsg, errorData);
+    throw new Error(`Midtrans API: ${errorMsg}`);
+  }
+
+  const data = await response.json();
   return {
-    token: simulatedToken,
-    redirect_url: `https://app.sandbox.midtrans.com/snap/v2/vtweb/${simulatedToken}`,
-    isSimulated: true,
+    token: data.token,
+    redirect_url: data.redirect_url,
+    isSimulated: false,
   };
 }
 
@@ -111,8 +105,8 @@ export function generateMidtransSignature(params: {
   gross_amount: string | number;
   server_key?: string;
 }): string {
-  const serverKey = params.server_key || getMidtransConfig().serverKey || 'default_server_key';
-  const grossAmountStr = String(params.gross_amount);
+  const serverKey = (params.server_key || getMidtransConfig().serverKey || '').trim();
+  const grossAmountStr = String(params.gross_amount).trim();
   const rawString = `${params.order_id}${params.status_code}${grossAmountStr}${serverKey}`;
   return crypto.createHash('sha512').update(rawString).digest('hex');
 }
@@ -126,39 +120,57 @@ export function verifyMidtransSignature(payload: {
   gross_amount: string | number;
   signature_key: string;
 }): boolean {
-  const { serverKey } = getMidtransConfig();
-  if (!serverKey || serverKey.includes('YOUR_SANDBOX_SERVER_KEY')) {
-    // In dev simulator without real key, accept for testing
-    return true;
-  }
-
-  const grossAmountStr = String(payload.gross_amount);
-  const rawString = `${payload.order_id}${payload.status_code}${grossAmountStr}${serverKey}`;
-  const computedHash = crypto.createHash('sha512').update(rawString).digest('hex');
-  if (computedHash.toLowerCase() === (payload.signature_key || '').toLowerCase()) {
-    return true;
-  }
-
-  // Also try with .00 if integer format, or without .00 if decimal format
-  if (!grossAmountStr.includes('.')) {
-    const withDecimals = `${payload.order_id}${payload.status_code}${grossAmountStr}.00${serverKey}`;
-    if (
-      crypto.createHash('sha512').update(withDecimals).digest('hex').toLowerCase() ===
-      (payload.signature_key || '').toLowerCase()
-    ) {
-      return true;
+  try {
+    const { serverKey } = getMidtransConfig();
+    if (!serverKey) {
+      console.warn('[Midtrans Webhook] MIDTRANS_SERVER_KEY is not configured in environment');
+      return false;
     }
-  } else if (grossAmountStr.endsWith('.00')) {
-    const withoutDecimals = `${payload.order_id}${payload.status_code}${grossAmountStr.replace('.00', '')}${serverKey}`;
-    if (
-      crypto.createHash('sha512').update(withoutDecimals).digest('hex').toLowerCase() ===
-      (payload.signature_key || '').toLowerCase()
-    ) {
-      return true;
-    }
-  }
 
-  return false;
+    const trimmedKey = serverKey.trim();
+    const cleanSig = (payload.signature_key || '').trim().toLowerCase();
+    const orderId = String(payload.order_id || '').trim();
+    const statusCode = String(payload.status_code || '').trim();
+    const grossAmountStr = String(payload.gross_amount ?? '').trim();
+
+    if (!orderId || !statusCode || !cleanSig) {
+      return false;
+    }
+
+    // 1. Direct hash with raw gross_amount string as sent by Midtrans
+    const hash1 = crypto
+      .createHash('sha512')
+      .update(`${orderId}${statusCode}${grossAmountStr}${trimmedKey}`)
+      .digest('hex')
+      .toLowerCase();
+    if (hash1 === cleanSig) return true;
+
+    // 2. Hash with standard 2 decimal format (e.g. 450000.00)
+    const numAmount = Number(grossAmountStr);
+    if (!isNaN(numAmount)) {
+      const formatted2Dec = numAmount.toFixed(2);
+      const hash2 = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${formatted2Dec}${trimmedKey}`)
+        .digest('hex')
+        .toLowerCase();
+      if (hash2 === cleanSig) return true;
+
+      // 3. Hash with integer format without decimals (e.g. 450000)
+      const formattedInt = String(Math.round(numAmount));
+      const hash3 = crypto
+        .createHash('sha512')
+        .update(`${orderId}${statusCode}${formattedInt}${trimmedKey}`)
+        .digest('hex')
+        .toLowerCase();
+      if (hash3 === cleanSig) return true;
+    }
+
+    return false;
+  } catch (err) {
+    console.error('[Midtrans Webhook] Signature verification exception:', err);
+    return false;
+  }
 }
 
 /**

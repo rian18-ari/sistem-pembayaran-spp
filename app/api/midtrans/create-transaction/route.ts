@@ -84,10 +84,11 @@ export async function POST(req: NextRequest) {
 
     const paymentRef = await addDoc(collection(db, 'payments'), paymentRecord);
 
-    // Update invoice to PENDING with this activePaymentId
+    // Update invoice to PENDING with this activePaymentId and orderId
     await updateDoc(invoiceRef, {
       status: 'PENDING',
       activePaymentId: paymentRef.id,
+      orderId: orderId,
       updatedAt: new Date().toISOString(),
     });
 

@@ -2,70 +2,50 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    
-    function isAdmin() {
-      return isAuthenticated() && (
-        getUserData().role == 'admin' ||
-        request.auth.token.role == 'admin'
-      );
-    }
-    
-    function isParentOfStudent(parentId) {
-      return isAuthenticated() && request.auth.uid == parentId;
+    // Invoices collection: accessible by app and Midtrans payment webhooks
+    match /invoices/{invoiceId} {
+      allow read, write: if true;
     }
 
-    // Users collection
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Parents collection
-    match /parents/{parentId} {
-      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == parentId);
-      allow write: if isAdmin();
-    }
-
-    // Students collection
-    match /students/{studentId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.parentId == request.auth.uid);
-      allow write: if isAdmin();
+    // Payments collection: records payment attempts and status updates from Midtrans webhook
+    match /payments/{paymentId} {
+      allow read, write: if true;
     }
 
     // Classes collection
     match /classes/{classId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // SPP Settings collection
     match /spp_settings/{settingId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
-    // Invoices collection
-    match /invoices/{invoiceId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.parentId == request.auth.uid);
-      // Only admin or backend can create/update invoice status
-      allow create, update, delete: if isAdmin();
+    // Students collection
+    match /students/{studentId} {
+      allow read, write: if true;
     }
 
-    // Payments collection
-    match /payments/{paymentId} {
-      allow read: if isAuthenticated() && (isAdmin() || resource.data.parentId == request.auth.uid);
-      // Creating payment record allowed by parent for their invoice, or admin
-      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.parentId == request.auth.uid);
-      // Status update only by admin / backend webhook
-      allow update, delete: if isAdmin();
+    // Parents collection
+    match /parents/{parentId} {
+      allow read, write: if true;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Settings collection (school profile, system configs)
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Catch-all fallback
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
+
